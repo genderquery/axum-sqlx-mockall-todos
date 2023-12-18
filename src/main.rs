@@ -1,5 +1,6 @@
 use std::{env, sync::Arc};
 
+use app::AppState;
 use endpoints::Todo;
 use sqlx::SqlitePool;
 use tower_http::trace::TraceLayer;
@@ -11,6 +12,19 @@ mod app;
 mod db;
 mod endpoints;
 mod provider;
+
+#[derive(Clone)]
+struct SqliteAppState {
+    pub provider: SqliteTodoProvider,
+}
+
+impl AppState for SqliteAppState {
+    type P = SqliteTodoProvider;
+
+    fn provider(&self) -> &Self::P {
+        &self.provider
+    }
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -35,8 +49,9 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!().run(&pool).await?;
 
     let provider = SqliteTodoProvider::from(&pool);
+    let state = SqliteAppState { provider };
 
-    let app = app::router(Arc::new(provider)).layer(TraceLayer::new_for_http());
+    let app = app::router(state).layer(TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::debug!("Listening at http://{}", listener.local_addr().unwrap());

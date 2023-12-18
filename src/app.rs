@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use axum::{
-    extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
@@ -13,20 +10,23 @@ use crate::{
     provider::{ProviderError, TodoProvider},
 };
 
-pub type DynTodoProvider = Arc<dyn TodoProvider + Send + Sync>;
-pub type AppState = State<DynTodoProvider>;
+pub trait AppState: Clone + Send + Sync + 'static {
+    type P: TodoProvider;
 
-pub fn router(provider: DynTodoProvider) -> Router {
+    fn provider(&self) -> &Self::P;
+}
+
+pub fn router<A: AppState>(state: A) -> Router {
     Router::new()
         .route(
             "/todos",
-            get(endpoints::get_todos).post(endpoints::add_todo),
+            get(endpoints::get_todos::<A>).post(endpoints::add_todo::<A>),
         )
         .route(
             "/todos/:id",
-            get(endpoints::get_todo).put(endpoints::update_todo),
+            get(endpoints::get_todo::<A>).put(endpoints::update_todo::<A>),
         )
-        .with_state(provider)
+        .with_state(state)
 }
 
 pub enum AppError {
@@ -78,6 +78,27 @@ mod tests {
 
     use super::*;
 
+    #[derive(Clone)]
+    struct MockAppState {
+        provider: Arc<MockTodoProvider>,
+    }
+
+    impl MockAppState {
+        pub fn new(provider: MockTodoProvider) -> Self {
+            Self {
+                provider: provider.into(),
+            }
+        }
+    }
+
+    impl AppState for MockAppState {
+        type P = MockTodoProvider;
+
+        fn provider(&self) -> &Self::P {
+            self.provider.as_ref()
+        }
+    }
+
     #[tokio::test]
     async fn test_get_todos() {
         let mut provider = MockTodoProvider::new();
@@ -96,7 +117,8 @@ mod tests {
             ])
         });
 
-        let app = router(Arc::new(provider));
+        let state = MockAppState::new(provider);
+        let app = router(state);
         let response = app
             .oneshot(
                 Request::builder()
@@ -140,7 +162,8 @@ mod tests {
                 }))
             });
 
-        let app = router(Arc::new(provider));
+        let state = MockAppState::new(provider);
+        let app = router(state);
         let response = app
             .oneshot(
                 Request::builder()
@@ -174,7 +197,8 @@ mod tests {
             .with(eq(1))
             .returning(|_| Ok(None));
 
-        let app = router(Arc::new(provider));
+        let state = MockAppState::new(provider);
+        let app = router(state);
         let response = app
             .oneshot(
                 Request::builder()
@@ -206,7 +230,8 @@ mod tests {
                 })
             });
 
-        let app = router(Arc::new(provider));
+        let state = MockAppState::new(provider);
+        let app = router(state);
         let response = app
             .oneshot(
                 Request::builder()
@@ -254,8 +279,8 @@ mod tests {
                 })
             });
 
-        let app = router(Arc::new(provider));
-
+        let state = MockAppState::new(provider);
+        let app = router(state);
         let response = app
             .oneshot(
                 Request::builder()
