@@ -2,6 +2,7 @@ use axum::{
     extract::{Path, State},
     Json,
 };
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -32,11 +33,11 @@ pub async fn get_todo<A: AppState>(
 pub async fn add_todo<A: AppState>(
     State(state): State<A>,
     Json(todo): Json<TodoAdd>,
-) -> Result<Json<Todo>, AppError> {
+) -> Result<(StatusCode, Json<Todo>), AppError> {
     let TodoAdd { description } = todo;
     let todo = state.provider().add_todo(&description).await?;
 
-    Ok(Json(todo))
+    Ok((StatusCode::CREATED, Json(todo)))
 }
 
 pub async fn update_todo<A: AppState>(

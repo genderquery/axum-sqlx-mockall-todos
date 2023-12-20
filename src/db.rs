@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use sqlx::{query_as, Pool, Sqlite, SqlitePool};
 
 use crate::{
+    endpoints::Todo,
     provider::{ProviderError, TodoProvider},
-    Todo,
 };
 
 #[derive(Clone)]

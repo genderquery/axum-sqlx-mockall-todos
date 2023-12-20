@@ -1,30 +1,9 @@
-use std::{env, sync::Arc};
+use std::env;
 
-use app::AppState;
-use endpoints::Todo;
+use axum_sqlx_mockall_todos::{app, db::SqliteTodoProvider, SqliteAppState};
 use sqlx::SqlitePool;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use crate::db::SqliteTodoProvider;
-
-mod app;
-mod db;
-mod endpoints;
-mod provider;
-
-#[derive(Clone)]
-struct SqliteAppState {
-    pub provider: SqliteTodoProvider,
-}
-
-impl AppState for SqliteAppState {
-    type P = SqliteTodoProvider;
-
-    fn provider(&self) -> &Self::P {
-        &self.provider
-    }
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
